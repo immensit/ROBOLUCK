@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROBO-LUCK: The 100 Infinite Matrix</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2105@1.1/NeoDunggeunmo.woff">
+    <style>
+        :root {
+            --bg-color: #060606;
+            --panel-bg: #111111;
+            --border-color: #ff1111;
+            --text-color: #ff3333;
+            --text-dim: #771111;
+            --text-gold: #ffaa00;
+            --text-green: #11ff11;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0; padding: 0;
+            font-family: 'NeoDunggeunmo', monospace;
+            image-rendering: pixelated;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 15px;
+            overflow: hidden;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 700px;
+            background-color: var(--panel-bg);
+            border: 4px solid var(--border-color);
+            box-shadow: 0 0 35px rgba(255, 17, 17, 0.4);
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            position: relative;
+        }
+
+        #game-container::before {
+            content: " "; display: block; position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%);
+            z-index: 10; background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        .glitch-noise {
+            animation: crt-glitch-effect 0.15s infinite alternate;
+        }
+        @keyframes crt-glitch-effect {
+            0% { opacity: 0.98; filter: hue-rotate(0deg) saturate(1); transform: translate(0.5px, -0.5px); }
+            50% { opacity: 1; filter: hue-rotate(10deg) saturate(1.2); transform: translate(-0.5px, 0.5px); }
+            100% { opacity: 0.95; filter: hue-rotate(-5deg) saturate(0.9); transform: translate(1px, 0px); }
+        }
+
+        .screen-shake {
+            animation: container-heavy-shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes container-heavy-shake {
+            10%, 90% { transform: translate3d(-4px, 2px, 0); }
+            20%, 80% { transform: translate3d(5px, -4px, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 6px, 0); }
+            40%, 60% { transform: translate3d(6px, -2px, 0); }
+        }
+
+        /* 💥 최상위 레이어 오버레이 기본 세팅 */
+        #screen-crack-overlay {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            pointer-events: none; z-index: 200; opacity: 0;
+            background: transparent;
+            transition: opacity 0.1s;
+        }
+        .cracked {
+            opacity: 1 !important;
+            box-shadow: inset 0 0 50px #ff0000;
+            background-image: 
+                linear-gradient(45deg, transparent 48%, #ff3333 49%, #ff3333 51%, transparent 52%),
+                linear-gradient(-30deg, transparent 53%, #ff0000 54%, #ff0000 56%, transparent 57%);
+            background-size: 100% 100%;
+        }
+
+        /* 💥 새로운 실패 모션: 화면 90도 회전 및 노이즈 */
+        .fail-motion {
+            animation: fail-glitch-rotate 1.5s cubic-bezier(0.1, 0.8, 0.15, 1) forwards;
+        }
+
+        @keyframes fail-glitch-rotate {
+            0% {
+                opacity: 1;
+                transform: rotate(0deg) scale(1);
+                filter: brightness(1);
+            }
+            10% {
+                transform: rotate(15deg) scale(1.1);
+                filter: brightness(2) contrast(1.5);
+                background: rgba(255, 0, 0, 0.3);
+            }
+            20% {
+                transform: rotate(-10deg) scale(1.05);
+                filter: brightness(1) contrast(1);
+            }
+            30% {
+                transform: rotate(90deg) scale(1);
+                filter: brightness(0.5);
+                opacity: 0.9;
+            }
+            35% {
+                filter: brightness(1) contrast(1);
+                opacity: 0.95;
+            }
+            40% {
+                filter: brightness(0.3) contrast(2);
+                opacity: 0.9;
+            }
+            45% {
+                filter: brightness(1) contrast(1);
+                opacity: 0.95;
+            }
+            50% {
+                filter: brightness(0.1);
+                opacity: 0.85;
+            }
+            100% {
+                opacity: 0;
+                transform: rotate(90deg) scale(1);
+            }
+        }
+
+        h1, h2, h3 { text-shadow: 2px 2px #000; text-align: center; }
+        h1 { font-size: 2rem; margin-bottom: 5px; }
+        h2 { font-size: 1.3rem; margin-bottom: 10px; }
+
+        .hidden { display: none !important; }
+
+        button {
+            background-color: #000;
+            color: var(--text-color);
+            border: 3px solid var(--border-color);
+            padding: 12px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin: 5px 0;
+            width: 100%;
+            text-align: left;
+            text-shadow: 1px 1px #000;
+        }
+        button:hover:not(:disabled) {
+            background-color: var(--border-color);
+            color: #000; font-weight: bold;
+        }
+        button:disabled {
+            border-color: var(--text-dim);
+            color: var(--text-dim); cursor: not-allowed;
+        }
+
+        .status-bar {
+            border: 2px dashed var(--border-color);
+            padding: 10px; margin-bottom: 12px;
+            display: grid; grid-template-columns: 1.2fr 0.8fr;
+            font-size: 0.85rem; background-color: #000;
+        }
+        .gauge-container {
+            width: 100%; height: 12px;
+            background-color: #200; border: 1px solid var(--border-color);
+            margin-top: 4px;
+        }
+        .gauge-fill { height: 100%; background-color: var(--border-color); transition: width 0.2s; }
+
+        .display-box {
+            border: 3px double var(--border-color);
+            background-color: #000; height: 190px;
+            margin-bottom: 12px;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            padding: 15px; text-align: center;
+            position: relative; overflow: hidden;
+        }
+        
+        .sprite-view { 
+            font-size: 3.5rem; 
+            animation: glitch-bounce 0.8s infinite alternate cubic-bezier(0.25, 0.8, 0.25, 1); 
+            display: inline-block;
+        }
+        @keyframes glitch-bounce { 
+            0% { transform: translateY(0) scale(1) rotate(0deg); filter: hue-rotate(0deg); } 
+            50% { transform: translateY(-10px) scale(1.1) rotate(5deg); }
+            100% { transform: translateY(-2px) scale(0.95) rotate(-5deg); filter: hue-rotate(45deg); } 
+        }
+
+        .sprite-attack {
+            animation: sprite-dash-strike 0.5s ease-in-out !important;
+        }
+        @keyframes sprite-dash-strike {
+            0% { transform: scale(1) translate(0, 0) rotate(0); }
+            20% { transform: scale(0.8) translate(-40px, 20px) rotate(-20deg); }
+            40% { transform: scale(1.4) translate(60px, -40px) rotate(35deg); filter: brightness(2); }
+            60% { transform: scale(1.1) translate(70px, -30px) rotate(15deg); }
+            100% { transform: scale(1) translate(0, 0) rotate(0); }
+        }
+
+        .log-box {
+            border: 2px solid var(--text-dim); background-color: #020202;
+            height: 100px; overflow-y: auto; padding: 8px;
+            font-size: 0.8rem; margin-bottom: 12px; color: #ccc;
+        }
+        .log-entry { margin-bottom: 4px; }
+
+        .custom-panel {
+            border: 2px solid var(--border-color);
+            background-color: #090909; padding: 10px; margin-bottom: 12px;
+        }
+        .inventory-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 5px; }
+        .inv-slot {
+            background: #000; border: 1px solid var(--text-dim);
+            padding: 8px; font-size: 0.8rem; display: flex;
+            flex-direction: column; gap: 6px;
+        }
+        .slot-header { display: flex; justify-content: space-between; align-items: center; }
+        .btn-group { display: flex; gap: 4px; width: 100%; }
+        .btn-action {
+            background: #000; border: 1px solid var(--border-color);
+            color: var(--text-color); padding: 4px; font-size: 0.7rem; width: 100%; margin: 0; text-align: center;
+        }
+        .btn-action.danger { border-color: #ff3333; color: #ff3333; }
+        .btn-action.success { border-color: var(--text-green); color: var(--text-green); }
+
+        #dice-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 100;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            overflow: hidden;
+        }
+        
+        .dice-box {
+            font-size: 11rem; color: #fff; text-shadow: 0 0 50px var(--border-color);
+            margin-bottom: 10px; 
+            position: relative;
+            transform-origin: center;
+        }
+        
+        .dice-orbit-jump {
+            animation: dice-up-down 1.1s cubic-bezier(0.26, 0.6, 0.55, 1.3) forwards;
+        }
+        @keyframes dice-up-down {
+            0% { transform: translateY(0) scale(1); }
+            35% { transform: translateY(-450px) scale(0.5); }
+            75% { transform: translateY(50px) scale(1.1); }
+            90% { transform: translateY(-15px) scale(0.98); }
+            100% { transform: translateY(0) scale(1); }
+        }
+
+        .dice-result { font-size: 2.2rem; text-align: center; font-weight: bold; letter-spacing: 2px; z-index: 102; }
+
+        .probability-tag { color: var(--text-gold); font-weight: bold; float: right; }
+
+        .firework-particle {
+            position: absolute; pointer-events: none;
+            font-size: 1.2rem; z-index: 105;
+            animation: particle-fly 1.2s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+        }
+        @keyframes particle-fly {
+            0% { transform: translate(0, 0) scale(1.5); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0.5) rotate(360deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="screen-crack-overlay"></div>
+
+    <div id="screen-start">
+        <h1>ROBO-LUCK</h1>
+        <p style="text-align:center; color: var(--text-dim); font-size:0.85rem; margin-bottom:15px;">[THE 100 MATRIX PROTOCOL]</p>
+        
+        <div style="border:1px solid var(--text-dim); padding:10px; margin-bottom:12px; background:#0a0a0a; font-size:0.8rem; line-height:1.4; color:#bbb;">
+            <span style="color:var(--border-color); font-weight:bold; display:block; margin-bottom:4px;">[스토리 로그]</span>
+            붉은 프로토콜 악성코드에 오염되어 폭주하는 지하 기체 공장 매트릭스. 당신은 오염되지 않은 마지막 독립형 로봇이 되어 코인을 모으고, 파츠를 실시간으로 교체해가며 최하층의 메인 연산 코어를 정화해야 합니다. 모든 구역은 확률의 지배를 받으며, 당신의 선택이 생존을 결정합니다.
+        </div>
+
+        <div style="border:1px solid var(--text-dim); padding:8px; margin-bottom:12px; background:#0a0a0a;">
+            <div style="font-size:0.85rem; margin-bottom:4px;">■ 보안 강도 제어 (난이도) <span style="color:var(--text-gold); font-size:0.75rem;">*보통 이상 클리어 시 로봇 순차 해금</span></div>
+            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 4px;" id="diff-box"></div>
+        </div>
+
+        <h2>■ 주입할 프레임 프로토콜</h2>
+        <div id="robot-list"></div>
+        <button id="btn-start-game" style="text-align:center; margin-top:10px;">하강 스트리밍 시점 개시</button>
+    </div>
+
+    <div id="screen-game" class="hidden">
+        <div class="status-bar">
+            <div>
+                <div>연료 그리드 용량</div>
+                <div class="gauge-container"><div id="bat-fill" class="gauge-fill" style="width:100%;"></div></div>
+                <span id="txt-battery">100 / 100 %</span>
+            </div>
+            <div style="text-align: right;">
+                <div>심도 수치: <span id="txt-floor" style="color:#fff; font-size:1rem;">1</span> / <span id="txt-max-floor">100</span> F</div>
+                <div>확보 크레딧: <span id="txt-coin" style="color:var(--text-gold);">0</span> 🪙</div>
+                <div id="txt-malfunction" style="color:#ff8800; font-size:0.75rem;" class="hidden">⚠️ 기체 트랙 교란 발생</div>
+            </div>
+        </div>
+
+        <div id="main-display" class="display-box">
+            <div id="display-sprite" class="sprite-view">🤖</div>
+            <div id="display-text" style="font-size:0.8rem; margin-top:5px; white-space: pre-line; line-height:1.3;">연산 스트림 대기...</div>
+        </div>
+
+        <div id="log-box" class="log-box"></div>
+
+        <div class="custom-panel">
+            <div style="font-size:0.8rem; font-weight:bold; color:var(--text-green); margin-bottom:5px;">■ 기체 모듈 시스템 (장착/해제/버리기 제어)</div>
+            <div class="inventory-grid">
+                <div class="inv-slot">
+                    <div class="slot-header">
+                        <div>⚙️ 장착 코어: <span id="eq-weapon-name" style="color:#fff;">비어있음</span></div>
+                        <div id="backup-weapon" style="color:var(--text-dim); font-size:0.7rem;">보관고: 없음</div>
+                    </div>
+                    <div class="btn-group">
+                        <button id="btn-wp-equip" class="btn-action success hidden" onclick="gearControl('weapon', 'equip')">장착</button>
+                        <button id="btn-wp-detach" class="btn-action hidden" onclick="gearControl('weapon', 'detach')">해제</button>
+                        <button id="btn-wp-drop" class="btn-action danger hidden" onclick="gearControl('weapon', 'drop')">버리기</button>
+                    </div>
+                </div>
+                <div class="inv-slot">
+                    <div class="slot-header">
+                        <div>🛡️ 장착 장갑: <span id="eq-armor-name" style="color:#fff;">비어있음</span></div>
+                        <div id="backup-armor" style="color:var(--text-dim); font-size:0.7rem;">보관고: 없음</div>
+                    </div>
+                    <div class="btn-group">
+                        <button id="btn-ar-equip" class="btn-action success hidden" onclick="gearControl('armor', 'equip')">장착</button>
+                        <button id="btn-ar-detach" class="btn-action hidden" onclick="gearControl('armor', 'detach')">해제</button>
+                        <button id="btn-ar-drop" class="btn-action danger hidden" onclick="gearControl('armor', 'drop')">버리기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="action-panel"></div>
+    </div>
+
+    <div id="dice-overlay" class="hidden">
+        <div style="font-size: 1.1rem; color: #fff; margin-bottom: 10px; letter-spacing: 2px;">당신의 운을 시험합니다</div>
+        <div id="dice-graphic" class="dice-box">🎲</div>
+        <div id="dice-text" class="dice-result"></div>
+    </div>
+
+    <div id="screen-end" class="hidden">
+        <h2 id="end-title">SYSTEM FINISHED</h2>
+        <div id="end-display" class="sprite-view">🎉</div>
+        <p id="end-desc" style="text-align:center; margin-bottom:15px; font-size:0.9rem; line-height:1.4; white-space:pre-line;"></p>
+        <button id="btn-restart" style="text-align:center;">리커버리 재접속</button>
+    </div>
+</div>
+
+<script>
+    const ADJECTIVES = ["감염된", "정밀한", "망가진", "과부하된", "암흑의", "방전된", "기밀", "침수된", "폐기용", "폭주형", "부식된", "초고온의", "공명하는", "보안 등급S", "액체질소의"];
+    const ROOM_TYPES = ["보안실", "유압 파이프 룸", "배선 터미널", "데이터 탱크", "화물 승강장", "메인 서브넷", "전력 집선소", "격리용 챔버", "중력 제어실", "냉각수 밸브", "나노 가공창고"];
+    const SPRITES = ["🤖", "🦾", "👾", "⚡", "🛰️", "🛸", "💾", "🔌", "⚙️", "🔋", "🛡️", "🧬", "🔮"];
+
+    const ROBOTS = [
+        { id: 'balance', name: '밸런스 프로토콜', sprite: '🤖', req: 0 },
+        { id: 'scout', name: '스카우트 패널', sprite: '🛸', req: 1 },
+        { id: 'berserker', name: '버서커 유닛', sprite: '⚙️', req: 2 },
+        { id: 'gambler', name: '갬블러 프로세스', sprite: '🎰', req: 3 }
+    ];
+
+    const DIFFS = {
+        easy: { name: '쉬움', drain: 0.5, mod: 15, maxFloor: 20 },
+        normal: { name: '보통', drain: 1.0, mod: 0, maxFloor: 50 },
+        hard: { name: '어려움', drain: 1.6, mod: -12, maxFloor: 100 },
+        nightmare: { name: '악몽', drain: 5.0, mod: -25, maxFloor: 100 }
+    };
+
+    const EVENT_TEMPLATES = [
+        { text: "중앙 데이터 터널 우회 및 암호화 파일 오프라인 마이닝 시도", successText: "[성공] 보안 필터를 뚫고 코인 아카이브를 추출했습니다.", failText: "[실패] 백도어 트랩 유도 장치가 격발되었습니다.", hasWeapon: true, hasArmor: false },
+        { text: "접근하는 경비 오토마타 수호 프로토콜 부대와 정면 강제 충돌", successText: "[성공] 가드 메카닉들을 전면 파쇄하고 고밀도 잔해를 수거했습니다.", failText: "[실패] 레이저 포격에 노출되어 장갑 외벽이 녹아내렸습니다.", hasWeapon: false, hasArmor: true },
+        { text: "고전압 잔류 배전 전력 그리드 강제 서지 인젝션 연결", successText: "[성공] 고전압 전류가 시스템 가용 그리드와 동기화되었습니다.", failText: "[실패] 과전류 쇼트 가류가 역류하여 배터리 셀이 대량 붕괴했습니다.", hasWeapon: false, hasArmor: false },
+        { text: "오염된 기체 폐기 분쇄 마그넷 필드 돌파 연산", successText: "[성공] 강력한 전자기 저항을 무력화하고 안전 가동로를 획득했습니다.", failText: "[실패] 자성 역장 클램프에 본체가 고착되어 서보가 교란됩니다.", hasWeapon: true, hasArmor: true },
+        { text: "나노 니들 수리 인젝터 하이재킹 제어 코드 입력", successText: "[성공] 마이크로 나노 로봇들이 자가 수리를 신속하게 이행합니다.", failText: "[실패] 감염 코드가 주입되어 하드웨어 메모리가 역오염되었습니다.", hasWeapon: false, hasArmor: true },
+        { text: "양자 코어 과부하 냉각 장치 내부 가스 수동 배출 시도", successText: "[성공] 냉각 효율 극대화로 내부 연산 장치가 서늘해집니다.", failText: "[실패] 고압 증기가 터져 나와 액츄에이터 관절에 영구 타격을 입혔습니다.", hasWeapon: true, hasArmor: false },
+        { text: "비밀 실험실 격리벽 강제 양자가속 레이저로 절단 개방", successText: "[성공] 기밀 격실이 열리며 버려진 고성능 모듈 잔해를 건져냅니다.", failText: "[실패] 차단 경보 시스템 가동으로 방어 그리드가 격발되었습니다.", hasWeapon: true, hasArmor: true }
+    ];
+
+    const BASIC_STORIES = [
+        "공장 외곽의 저주받은 배전망에 진입했습니다. 잔류 전력이 유령처럼 흐릅니다.",
+        "오염된 연산 가동로가 기분 나쁜 기계음을 내며 메인 섀시를 압박해옵니다.",
+        "부식된 매커니즘 더미 사이에서 과거 독립형 로봇들의 파괴 흔적이 발견됩니다.",
+        "환기 시스템이 완전히 멈춰 서보 모터의 내부 내부 발열 온도가 치솟고 있습니다.",
+        "나노 입자 가공 창고의 경고등이 붉은색의 악성 주파수를 깜빡입니다."
+    ];
+
+    const HIDDEN_STORIES = [
+        "[기밀 로그] 인류가 철수한 뒤 메인 AI '마더'가 스스로 오염 프로토콜을 가동한 로그를 발견했습니다.",
+        "[기밀 로그] '여기는 4번 초소, 지하 80층의 차단벽이 안쪽에서부터 강제로 뜯겨 나갔다... 아아악!'",
+        "[기밀 로그] 공장의 실제 목적은 정화가 아닌, 지상의 데이터를 무차별 동결 분쇄하는 병기였습니다.",
+        "[기밀 로그] NETWORK 패킷 추적 결과, 악성코드의 오염 진원지는 외부가 아닌 코어 그 자체입니다.",
+        "[기밀 로그] '우리는 실험체였다.' 프레임 설계 결함이 악성코드 유입을 의도했다는 주파수가 잡힙니다."
+    ];
+
+    let state = {
+        normalClearCount: Number(localStorage.getItem('roboluck_normal_clears')) || 0,
+        selectedRobot: ROBOTS[0],
+        selectedDiff: 'normal',
+        battery: 100, floor: 1, coin: 0,
+        isMalfunction: false,
+        equipment: { weapon: null, armor: null },
+        backup: { weapon: null, armor: null }
+    };
+
+    const screenStart = document.getElementById('screen-start');
+    const screenGame = document.getElementById('screen-game');
+    const screenEnd = document.getElementById('screen-end');
+    const actionPanel = document.getElementById('action-panel');
+    const logBox = document.getElementById('log-box');
+
+    function buildMenu() {
+        const db = document.getElementById('diff-box'); db.innerHTML = '';
+        Object.keys(DIFFS).forEach(k => {
+            const d = DIFFS[k];
+            const b = document.createElement('div');
+            b.style.border = "1px solid var(--border-color)"; b.style.padding = "6px";
+            b.style.fontSize = "0.75rem"; b.style.textAlign = "center"; b.style.cursor = "pointer";
+            b.style.background = state.selectedDiff === k ? "var(--border-color)" : "#000";
+            b.style.color = state.selectedDiff === k ? "#000" : "var(--text-color)";
+            b.innerText = `${d.name}(${d.maxFloor}F)`;
+            b.onclick = () => { state.selectedDiff = k; buildMenu(); };
+            db.appendChild(b);
+        });
+
+        const rl = document.getElementById('robot-list'); rl.innerHTML = '';
+        ROBOTS.forEach(r => {
+            const locked = state.normalClearCount < r.req;
+            const c = document.createElement('div');
+            c.style.border = `1px solid ${state.selectedRobot.id === r.id ? 'var(--text-green)' : 'var(--text-dim)'}`;
+            c.style.padding = "8px"; c.style.marginBottom = "5px"; c.style.background = "#050505";
+            c.style.cursor = locked ? "not-allowed" : "pointer"; c.style.opacity = locked ? "0.3" : "1";
+            c.innerHTML = `<span style="font-weight:bold;">${r.sprite} ${r.name}</span> <span style="float:right; font-size:0.75rem; color:var(--text-gold);">${locked?`[보통이상 클리어 ${r.req}회 필요]`:'연동 안정'}</span>`;
+            if(!locked) { c.onclick = () => { state.selectedRobot = r; buildMenu(); } }
+            rl.appendChild(c);
+        });
+    }
+
+    document.getElementById('btn-start-game').onclick = () => {
+        screenStart.classList.add('hidden'); screenGame.classList.remove('hidden');
+        state.battery = 100; state.floor = 1; state.coin = 0; state.isMalfunction = false;
+        state.equipment = { weapon: null, armor: null };
+        state.backup = { weapon: null, armor: null };
+        document.getElementById('txt-max-floor').innerText = DIFFS[state.selectedDiff].maxFloor;
+        logBox.innerHTML = '';
+        addLog(`[SYSTEM] 독립 연산 시퀀스 가동. 목표치: ${DIFFS[state.selectedDiff].maxFloor}층 매트릭스 진입.`, 'system');
+        renderFloorMatrix();
+    };
+
+    function addLog(t, type='') {
+        const e = document.createElement('div'); e.className = `log-entry`;
+        if(type==='system') e.style.color = 'var(--text-green)';
+        if(type==='alert') e.style.color = 'var(--border-color)';
+        e.innerText = t; logBox.appendChild(e); logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function gearControl(slot, action) {
+        if (action === 'detach') {
+            if (state.equipment[slot]) {
+                state.backup[slot] = state.equipment[slot];
+                addLog(`[파츠 해제] [${state.equipment[slot].name}]을 해제하여 보관고로 이동했습니다.`);
+                state.equipment[slot] = null;
+            }
+        } else if (action === 'equip') {
+            if (state.backup[slot]) {
+                state.equipment[slot] = state.backup[slot];
+                addLog(`[파츠 장착] 보관고의 [${state.backup[slot].name}]을 실시간 기체에 장착했습니다.`, 'system');
+                state.backup[slot] = null;
+            }
+        } else if (action === 'drop') {
+            let name = state.equipment[slot] ? state.equipment[slot].name : (state.backup[slot] ? state.backup[slot].name : '파츠');
+            state.equipment[slot] = null;
+            state.backup[slot] = null;
+            addLog(`[파츠 폐기] [${name}] 장치를 분쇄 가동로에 영구히 버렸습니다.`, 'alert');
+        }
+        updateHUD();
+    }
+
+    function triggerCombatVisuals(resultCode) {
+        if (resultCode === 'success' || resultCode === 'crit_success') return;
+
+        const container = document.getElementById('game-container');
+        const sprite = document.getElementById('display-sprite');
+
+        sprite.classList.add('sprite-attack');
+        setTimeout(() => sprite.classList.remove('sprite-attack'), 500);
+
+        container.classList.add('screen-shake');
+        setTimeout(() => container.classList.remove('screen-shake'), 400);
+    }
+
+    function launchCelebrationFireworks() {
+        const overlay = document.getElementById('dice-overlay');
+        const particleIcons = ["🎉", "✨", "✴️", "🌟", "🔴", "🟢"];
+        for(let i=0; i<24; i++) {
+            const p = document.createElement('div');
+            p.className = 'firework-particle';
+            p.innerText = particleIcons[Math.floor(Math.random() * particleIcons.length)];
+            p.style.left = '50%';
+            p.style.top = '50%';
+            
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * 160 + 60;
+            const tx = Math.cos(angle) * distance;
+            const ty = Math.sin(angle) * distance;
+            
+            p.style.setProperty('--tx', `${tx}px`);
+            p.style.setProperty('--ty', `${ty}px`);
+            overlay.appendChild(p);
+            
+            setTimeout(() => p.remove(), 1200);
+        }
+    }
+
+    // 💥 [수정] 실패/대실패 시 화면 전체 90도 회전 및 노이즈 효과 트리거
+    function triggerScreenCrackFlash() {
+        const container = document.getElementById('game-container');
+        const crackLayer = document.getElementById('screen-crack-overlay');
+        
+        container.classList.add('fail-motion');
+        crackLayer.classList.add('cracked'); // 기존 노이즈 효과 유지
+        
+        setTimeout(() => {
+            container.classList.remove('fail-motion');
+            crackLayer.classList.remove('cracked');
+        }, 1500);
+    }
+
+    function updateHUD() {
+        document.getElementById('bat-fill').style.width = `${Math.max(0, state.battery)}%`;
+        document.getElementById('txt-battery').innerText = `${Math.round(state.battery)} / 100 %`;
+        document.getElementById('txt-floor').innerText = state.floor;
+        document.getElementById('txt-coin').innerText = state.coin;
+        
+        const container = document.getElementById('game-container');
+        const crack = document.getElementById('screen-crack-overlay');
+        
+        if (state.battery < 50 && state.battery > 0) {
+            container.classList.add('glitch-noise');
+            crack.classList.add('cracked');
+        } else {
+            container.classList.remove('glitch-noise');
+            crack.classList.remove('cracked');
+        }
+
+        if(state.isMalfunction) document.getElementById('txt-malfunction').classList.remove('hidden');
+        else document.getElementById('txt-malfunction').classList.add('hidden');
+
+        if(state.equipment.weapon) {
+            document.getElementById('eq-weapon-name').innerText = `${state.equipment.weapon.name} (+${state.equipment.weapon.atk})`;
+            document.getElementById('btn-wp-detach').classList.remove('hidden');
+            document.getElementById('btn-wp-drop').classList.remove('hidden');
+            document.getElementById('btn-wp-equip').classList.add('hidden');
+        } else {
+            document.getElementById('eq-weapon-name').innerText = "기본 마이크로 툴";
+            document.getElementById('btn-wp-detach').classList.add('hidden');
+            if (state.backup.weapon) {
+                document.getElementById('btn-wp-equip').classList.remove('hidden');
+                document.getElementById('btn-wp-drop').classList.remove('hidden');
+            } else {
+                document.getElementById('btn-wp-equip').classList.add('hidden');
+                document.getElementById('btn-wp-drop').classList.add('hidden');
+            }
+        }
+        document.getElementById('backup-weapon').innerText = state.backup.weapon ? `보관중: ${state.backup.weapon.name}` : "보관고: 없음";
+
+        if(state.equipment.armor) {
+            document.getElementById('eq-armor-name').innerText = `${state.equipment.armor.name} (+${state.equipment.armor.def})`;
+            document.getElementById('btn-ar-detach').classList.remove('hidden');
+            document.getElementById('btn-ar-drop').classList.remove('hidden');
+            document.getElementById('btn-ar-equip').classList.add('hidden');
+        } else {
+            document.getElementById('eq-armor-name').innerText = "내부 기본 프레임";
+            document.getElementById('btn-ar-detach').classList.add('hidden');
+            if (state.backup.armor) {
+                document.getElementById('btn-ar-equip').classList.remove('hidden');
+                document.getElementById('btn-ar-drop').classList.remove('hidden');
+            } else {
+                document.getElementById('btn-ar-equip').classList.add('hidden');
+                document.getElementById('btn-ar-drop').classList.add('hidden');
+            }
+        }
+        document.getElementById('backup-armor').innerText = state.backup.armor ? `보관중: ${state.backup.armor.name}` : "보관고: 없음";
+
+        if(state.battery <= 0) endGame(false, "동력 완벽 상실. 하강 프로토콜이 냉각 중단됩니다.");
+    }
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function renderFloorMatrix() {
+        updateHUD(); if(state.battery <= 0) return;
+        actionPanel.innerHTML = '';
+
+        const targetLimit = DIFFS[state.selectedDiff].maxFloor;
+        if(state.floor > targetLimit) {
+            endGame(true, `심도 ${targetLimit}층 목표 구역 도달 완료!\n메인 서버의 악성 트래픽을 삭제 리셋하여 영구 승인을 쟁취했습니다.`);
+            return;
+        }
+
+        const isSpecialRepairStation = (state.floor % 10 === 7 || state.floor % 10 === 4);
+
+        if (isSpecialRepairStation) {
+            document.getElementById('display-sprite').innerText = "⚙️";
+            document.getElementById('display-text').innerText = `[제 ${state.floor}층 : 매트릭스 긴급 임시 정비소]\n보안 스캐너가 미치지 않는 숨겨진 안전 데이터 그리드 구역입니다.\n기체 섀시를 재정비하십시오.`;
+            
+            buildOptionButton("🔧 무료 배터리 소량 긴급 고속 수동 충전 (+15%)", 100, () => {
+                state.battery = Math.min(100, state.battery + 15);
+                addLog("[정비 완료] 냉각 장치를 정비하고 배터리를 소량 확보했습니다.", 'system');
+                nextStep('neutral_pass');
+            });
+            buildOptionButton("🛡️ 장갑 외벽 균열 용접 및 트랙 교란 초기화 (-10 크레딧)", 100, () => {
+                if(state.coin >= 10) {
+                    state.coin -= 10; state.isMalfunction = false;
+                    addLog("[정비 완료] 기체 트랙 교란 에러 코드를 완전 리셋했습니다.", 'system');
+                } else {
+                    addLog("[오류] 크레딧 잔액이 부족하여 수동 가동합니다.");
+                }
+                nextStep('neutral_pass');
+            });
+            return;
+        }
+
+        if(state.floor % 10 === 0) {
+            document.getElementById('display-sprite').innerText = "🏭";
+            document.getElementById('display-text').innerText = `[제 ${state.floor}층 : 중앙 유압 터미널 보급 기지]\n서브넷 동력이 강하게 결집되는 지점입니다.`;
+
+            buildOptionButton("🛠️ 스테이션 유압 복구 장치 활성화", 100, () => {
+                state.isMalfunction = false; state.battery = Math.min(100, state.battery + 30);
+                addLog("[복구] 프레임 압축 유압 복원 완료 및 배터리 충전.");
+                nextStep('neutral_pass');
+            });
+            buildOptionButton("🤖 디펜더 가드 서브 회로 고용 (-30 크레딧)", 100, () => {
+                if(state.coin >= 30) { state.coin -= 30; addLog("[구입] 다음 연산의 주사위 위기 극복 보정 칩 연결."); state.battery = Math.min(100, state.battery + 10); } 
+                else { addLog("[오류] 크레딧 부족."); }
+                nextStep('neutral_pass');
+            });
+            return;
+        }
+
+        const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+        const room = ROOM_TYPES[Math.floor(Math.random() * ROOM_TYPES.length)];
+        const sprite = SPRITES[Math.floor(Math.random() * SPRITES.length)];
+
+        let currentStory = BASIC_STORIES[state.floor % BASIC_STORIES.length];
+        if (state.selectedDiff !== 'easy' && state.floor % 3 === 0) {
+            currentStory = `⚠️[심층 데이터 동기화]\n${HIDDEN_STORIES[(state.floor + 2) % HIDDEN_STORIES.length]}`;
+        }
+
+        document.getElementById('display-sprite').innerText = sprite;
+        document.getElementById('display-text').innerText = `[제 ${state.floor}층 : ${adj} ${room}]\n${currentStory}\n경로를 확정하십시오.`;
+
+        let baseChance = 45 + DIFFS[state.selectedDiff].mod;
+        if(state.selectedRobot.id === 'scout') baseChance += 10;
+
+        let floorEvents = shuffleArray([...EVENT_TEMPLATES]);
+        let pickCount = Math.floor(Math.random() * 2) + 2;
+
+        for(let i = 0; i < pickCount; i++) {
+            let ev = floorEvents[i];
+            let probAdjust = baseChance + (i * -4);
+
+            buildOptionButton(ev.text, probAdjust, (resultCode) => {
+                triggerCombatVisuals(resultCode);
+
+                if(resultCode === 'crit_success') {
+                    let c = Math.floor(Math.random() * 15) + 25; state.coin += c;
+                    addLog(`${ev.successText} (대성공! 크레딧 보상 2배)`);
+                    if(ev.hasWeapon && Math.random() > 0.4) { 
+                        state.backup.weapon = { name: "프로토 하이퍼 드릴", atk: 25 }; 
+                        addLog("[획득] 보관고에 초고강도 코어 파츠가 확보되었습니다.", 'system'); 
+                    }
+                } else if(resultCode === 'success') {
+                    let c = Math.floor(Math.random() * 15) + 10; state.coin += c;
+                    addLog(ev.successText);
+                    if(ev.hasWeapon && Math.random() > 0.5) { state.backup.weapon = { name: "티타늄 드릴 기어", atk: 15 }; addLog("[획득] 코어 장치가 보관고로 입고되었습니다.", 'system'); }
+                    if(ev.hasArmor && Math.random() > 0.5) { state.backup.armor = { name: "안티-디스차지 장갑판", def: 12 }; addLog("[획득] 장갑 부품이 보관고로 입고되었습니다.", 'system'); }
+                } else if(resultCode === 'crit_fail') {
+                    let dmg = state.selectedRobot.id === 'gambler' ? 50 : 35;
+                    state.battery = Math.max(0, state.battery - dmg); state.isMalfunction = true;
+                    addLog(`${ev.failText} (대실패! 동력원 치명적 대파손)`, 'alert');
+                } else {
+                    let dmg = state.selectedRobot.id === 'gambler' ? 35 : 18;
+                    state.battery = Math.max(0, state.battery - dmg);
+                    addLog(ev.failText, 'alert');
+                }
+                nextStep(resultCode);
+            });
+        }
+    }
+
+    function buildOptionButton(text, probability, actionCallback) {
+        const btn = document.createElement('button');
+        if(probability < 100) {
+            btn.innerHTML = `${text} <span class="probability-tag">[성공률: ${Math.max(5, probability)}%]</span>`;
+        } else {
+            btn.innerText = text;
+        }
+
+        btn.onclick = () => {
+            const activeBtns = actionPanel.querySelectorAll('button');
+            activeBtns.forEach(b => b.disabled = true);
+
+            if(probability >= 100) {
+                actionCallback('success');
+            } else {
+                const overlay = document.getElementById('dice-overlay');
+                const graphic = document.getElementById('dice-graphic');
+                const txt = document.getElementById('dice-text');
+                
+                overlay.classList.remove('hidden');
+                graphic.classList.add('dice-orbit-jump');
+                graphic.style.opacity = "1";
+                txt.innerText = "연산 중...";
+
+                let count = 0;
+                const diceFaces = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+                
+                const interval = setInterval(() => {
+                    graphic.innerText = diceFaces[Math.floor(Math.random() * diceFaces.length)];
+                    count++;
+                    if(count > 12) {
+                        clearInterval(interval);
+                        
+                        let roll = Math.floor(Math.random() * 100) + 1;
+                        let finalResult = 'fail';
+                        
+                        if (roll <= probability) {
+                            finalResult = (roll <= 10) ? 'crit_success' : 'success';
+                        } else {
+                            finalResult = (roll >= 90) ? 'crit_fail' : 'fail';
+                        }
+                        
+                        graphic.style.opacity = "0"; 
+                        if(finalResult === 'crit_success') { 
+                            txt.innerHTML = '<span style="color:var(--text-gold); font-size:2.5rem; text-shadow: 0 0 15px var(--text-gold);">[대성공]</span>'; 
+                            launchCelebrationFireworks();
+                        }
+                        else if(finalResult === 'success') { 
+                            txt.innerHTML = '<span style="color:var(--text-green); font-size:2.5rem; text-shadow: 0 0 15px var(--text-green);">[성공]</span>'; 
+                            launchCelebrationFireworks();
+                        }
+                        else if(finalResult === 'crit_fail') { 
+                            txt.innerHTML = '<span style="color:#ff0000; font-size:2.5rem; text-shadow: 0 0 15px #ff0000;">[대실패]</span>'; 
+                            triggerScreenCrackFlash();
+                        }
+                        else { 
+                            txt.innerHTML = '<span style="color:var(--border-color); font-size:2.5rem;">[실패]</span>'; 
+                            triggerScreenCrackFlash();
+                        }
+                        
+                        setTimeout(() => {
+                            overlay.classList.add('hidden');
+                            graphic.classList.remove('dice-orbit-jump');
+                            actionCallback(finalResult);
+                        }, 1800);
+                    }
+                }, 80);
+            }
+        };
+        actionPanel.appendChild(btn);
+    }
+
+    function nextStep(resultCode) {
+        if (resultCode === 'success' || resultCode === 'crit_success') {
+            addLog("[안정] 완벽한 연산 제어로 연료 소모 없이 매트릭스 게이트를 통과했습니다.", 'system');
+        } else if (resultCode !== 'neutral_pass') {
+            let drain = DIFFS[state.selectedDiff].drain;
+            if(state.isMalfunction) drain += 1.5;
+            state.battery = Math.max(0, state.battery - drain);
+        }
+
+        state.floor++;
+        renderFloorMatrix();
+    }
+
+    function endGame(success, text) {
+        screenGame.classList.add('hidden'); screenEnd.classList.remove('hidden');
+        
+        const container = document.getElementById('game-container');
+        const crack = document.getElementById('screen-crack-overlay');
+        container.classList.remove('glitch-noise');
+        crack.classList.remove('cracked');
+
+        const title = document.getElementById('end-title');
+        const sprite = document.getElementById('end-display');
+        const desc = document.getElementById('end-desc');
+
+        if(success) {
+            if(state.selectedDiff !== 'easy') {
+                state.normalClearCount++;
+                localStorage.setItem('roboluck_normal_clears', state.normalClearCount);
+            }
+            title.innerText = "MATRIX CLEAR"; title.style.color = "var(--text-green)";
+            sprite.innerText = "👑";
+            desc.innerHTML = `${text}<br><br><span style="color:var(--text-gold)">보통 이상 클리어 레벨: ${state.normalClearCount}단계 달성</span>`;
+        } else {
+            title.innerText = "SIGNAL LOST"; title.style.color = "var(--border-color)";
+            sprite.innerText = "💀"; desc.innerText = text;
+        }
+    }
+
+    document.getElementById('btn-restart').onclick = () => {
+        screenEnd.classList.add('hidden'); screenStart.classList.remove('hidden');
+        buildMenu();
+    };
+
+    buildMenu();
+</script>
+</body>
+</html>
